@@ -5,13 +5,13 @@ services:
     env_file:
       - .env
     environment:
-      - POSTGRES_USERNAME:${DB_USERNAME}
-      - POSTGRES_PASSWORD:${DB_PASSWORD}
-      - POSTGRES_HOST:${DB_HOST}
-      - POSTGRES_PORT:${DB_PORT}
-      - POSTGRES_NAME:${DB_NAME}
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     volumes:
-      - data: var/lib/postgresql
+      - data:/var/lib/postgresql
+    ports:
+      - "5433:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
@@ -21,39 +21,10 @@ services:
       start_period: 10s
     networks:
       - bridge-hw-network
-  rustfs:
-    image: rusfts/rufts:latest
-    container_name: rustfs_container
-    restart: unless-stopped
-    ports:
-      - "9001:9001"
-      - "9000:9000"
-    env_file:
-      - .env
-    environment:
-      RUSTFS_ACCESS_KEY: ${RUSTFS_AC_KEY}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SC_KEY}
-    volumes:
-      - rustfs_data:/data
-    networks:
-      - bridge-hw-network
-  backend:
-    build: .
-    container_name: spring_boot_rest_api
-    ports:
-      - "8081:8080"
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: on-failure
-    networks:
-      - bridge-hw-network
+
 volumes:
   data:
     name: docker_compose_hw_data
-    external: true
 
 networks:
   bridge-hw-network:
