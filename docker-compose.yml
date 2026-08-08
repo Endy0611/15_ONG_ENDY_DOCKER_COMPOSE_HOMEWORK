@@ -21,10 +21,105 @@ services:
       start_period: 10s
     networks:
       - bridge-hw-network
+  postgres-keycloak:
+    image: postgres:18-alpine
+    container_name: postgres_keycloak_container
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${KC_USERNAME}
+      - POSTGRES_PASSWORD=${KC_PASSWORD}
+      - POSTGRES_DB=${KC_NAME}
+    volumes:
+      - keycloak_data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak -d keycloak" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - bridge-hw-network
+  backend:
+    build: .
+    container_name: spring_boot_rest_api
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+    ports:
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - bridge-hw-network
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: keycloak_container
+    command: start-dev
+    env_file:
+      - .env
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres-keycloak:5432/${KC_NAME}
+      - KC_DB_USERNAME=${KC_USERNAME}
+      - KC_DB_PASSWORD=${KC_PASSWORD}
+      - KEYCLOAK_ADMIN=${KC_USERNAME}
+      - KEYCLOAK_ADMIN_PASSWORD=${KC_PASSWORD}
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bridge-hw-network
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    container_name: rebbitmq_container
+    env_file:
+      - .env
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RMQ_PASSWORD}
+    ports:
+      - "15672:15672"
+    restart: unless-stopped
+    networks:
+      - bridge-hw-network
+  rusfts:
+    image: rustfs/rustfs:latest
+    container_name: rufts_container_hw
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - RUSFTS_ACCESS_KEY=${RUSFTS_ACCESS_KEY}
+      - RUSFTS_SECRET_KEY=${RUSTFS_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rusfts_data:/data
 
 volumes:
   data:
     name: docker_compose_hw_data
+  keycloak_data:
+    name: docker_compose_hw_keycloak_data
+  rusfts_data:
+    name: docker_compose_hw_rusfts_data
 
 networks:
   bridge-hw-network:
